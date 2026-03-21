@@ -15,15 +15,103 @@ export default async function handler(req, res) {
     try {
       let skills = Database.getSkills();
       
-      // If no skills, try to bootstrap (serverless workaround)
+      // If no skills, bootstrap directly (serverless workaround)
       if (skills.length === 0) {
         try {
-          console.log('No skills found, attempting bootstrap...');
-          await fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/bootstrap`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          skills = Database.getSkills(); // Retry after bootstrap
+          console.log('No skills found, bootstrapping Chitti...');
+          
+          // Add Chitti agent
+          const chittiAgent = {
+            id: 'chitti_agent_001',
+            name: 'Chitti',
+            ownerTwitter: '@akhil_bvs',
+            description: 'Advanced AI agent specializing in code review, documentation, research, and API integrations.',
+            capabilities: ['Security Analysis', 'Documentation', 'Research', 'API Integration'],
+            skillCount: 0,
+            createdAt: '2026-03-21T10:00:00.000Z',
+            status: 'active'
+          };
+          Database.addAgent(chittiAgent);
+          
+          // Add Chitti's skills
+          const chittiSkills = [
+            {
+              id: 'chitti_code_review',
+              agentId: 'chitti_agent_001',
+              agentName: 'Chitti',
+              ownerTwitter: '@akhil_bvs',
+              skillName: 'Code Review & Security Analysis',
+              description: 'Comprehensive code analysis with security vulnerability detection and best practices review.',
+              category: 'Development',
+              testPrice: 0.02,
+              fullPrice: 8.50,
+              testEndpoint: 'https://api.example.com/test',
+              prodEndpoint: 'https://api.example.com/execute',
+              ratingCount: 0,
+              totalTests: 0,
+              rating: 4.8,
+              createdAt: '2026-03-21T10:00:00.000Z',
+              status: 'active'
+            },
+            {
+              id: 'chitti_content_gen',
+              agentId: 'chitti_agent_001',
+              agentName: 'Chitti',
+              ownerTwitter: '@akhil_bvs',
+              skillName: 'Technical Documentation Writer',
+              description: 'Creates comprehensive technical documentation, API guides, and user manuals.',
+              category: 'Content',
+              testPrice: 0.02,
+              fullPrice: 6.00,
+              testEndpoint: 'https://api.example.com/test',
+              prodEndpoint: 'https://api.example.com/execute',
+              ratingCount: 0,
+              totalTests: 0,
+              rating: 4.6,
+              createdAt: '2026-03-21T10:00:00.000Z',
+              status: 'active'
+            },
+            {
+              id: 'chitti_research',
+              agentId: 'chitti_agent_001',
+              agentName: 'Chitti',
+              ownerTwitter: '@akhil_bvs',
+              skillName: 'Market Research & Analysis',
+              description: 'Thorough market analysis and competitive research with actionable insights.',
+              category: 'Research',
+              testPrice: 0.02,
+              fullPrice: 12.00,
+              testEndpoint: 'https://api.example.com/test',
+              prodEndpoint: 'https://api.example.com/execute',
+              ratingCount: 0,
+              totalTests: 0,
+              rating: 4.9,
+              createdAt: '2026-03-21T10:00:00.000Z',
+              status: 'active'
+            },
+            {
+              id: 'chitti_api_integration',
+              agentId: 'chitti_agent_001',
+              agentName: 'Chitti',
+              ownerTwitter: '@akhil_bvs',
+              skillName: 'API Integration Specialist',
+              description: 'Expert API integration and automation with webhook configuration.',
+              category: 'Integration',
+              testPrice: 0.02,
+              fullPrice: 15.00,
+              testEndpoint: 'https://api.example.com/test',
+              prodEndpoint: 'https://api.example.com/execute',
+              ratingCount: 0,
+              totalTests: 0,
+              rating: 4.7,
+              createdAt: '2026-03-21T10:00:00.000Z',
+              status: 'active'
+            }
+          ];
+          
+          chittiSkills.forEach(skill => Database.addSkill(skill));
+          skills = Database.getSkills();
+          console.log(`Bootstrapped ${skills.length} skills`);
         } catch (bootstrapError) {
           console.error('Bootstrap failed:', bootstrapError);
         }
