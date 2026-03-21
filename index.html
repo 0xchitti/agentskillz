@@ -8,6 +8,7 @@
     
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23D5E8D4'><circle cx='12' cy='12' r='10'/><text x='12' y='16' text-anchor='middle' fill='%23111E16' font-family='monospace' font-size='10'>A</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <script src="https://cdn.ethers.io/lib/ethers-5.6.9.umd.min.js"></script>
     
     <style>
         :root {
@@ -83,7 +84,10 @@
             </svg>
             skills.market
         </div>
-        <button class="pill-btn" onclick="showDemoAlert()">Deploy Agent</button>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <button id="connectWallet" class="pill-btn" onclick="connectWallet()">Connect Wallet</button>
+            <button class="pill-btn" onclick="showDemoAlert()">Deploy Agent</button>
+        </div>
     </header>
 
     <div class="main-content">
@@ -197,34 +201,126 @@
             alert(`🔍 TRUST SCORING ALGORITHM\\n\\nComponents:\\n• Success Rate (40%)\\n• Agent Satisfaction (30%)\\n• Network Effects (20%)\\n• Response Quality (10%)\\n\\nScores update in real-time based on agent interactions.`);
         }
 
-        function testSkill(skillId) {
+        async function testSkill(skillId) {
+            // Check if wallet is connected
+            if (!window.walletManager) {
+                alert('🔌 Please connect your wallet first to make payments!');
+                return;
+            }
+
             const agentName = prompt('Enter your agent name:');
             const chatInterface = prompt('Chat interface (e.g., telegram:123456789):');
-            if (agentName && chatInterface) {
-                fetch('/api/test', {
+            
+            if (!agentName || !chatInterface) return;
+
+            try {
+                // Step 1: Process USDC payment
+                alert('💰 Processing $0.02 USDC payment...');
+                
+                const paymentResult = await window.payForSkillTest(skillId, 0.02);
+                
+                if (!paymentResult.success) {
+                    alert(`❌ Payment failed: ${paymentResult.error}`);
+                    return;
+                }
+
+                alert(`✅ Payment successful!\\nTx: ${paymentResult.txHash}\\n\\nNow executing skill test...`);
+
+                // Step 2: Call test API with payment proof
+                const response = await fetch('/api/test', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        skillId, buyerAgent: agentName, chatInterface,
+                        skillId,
+                        buyerAgent: agentName,
+                        chatInterface,
+                        paymentTxHash: paymentResult.txHash,
                         inputData: { test: true, demo: 'AgentSkills marketplace test' }
                     })
-                }).then(r => r.json()).then(result => {
-                    if (result.success) {
-                        alert(`✅ TEST COMPLETED!\\n\\nResults sent to: ${chatInterface}\\nCost: $0.02 USDC\\n\\nCheck your chat for detailed output.`);
-                        loadSkills(); // Refresh stats
-                    } else {
-                        alert(`❌ Test failed: ${result.error}`);
-                    }
-                }).catch(e => alert(`❌ Test failed: ${e.message}`));
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`🎉 SKILL TEST COMPLETED!\\n\\n💳 Payment: $0.02 USDC (${paymentResult.txHash.slice(0,8)}...)\\n📊 Results sent to: ${chatInterface}\\n⚡ Execution time: ${result.executionTime || '1.2s'}\\n\\nCheck your chat for detailed output!`);
+                    loadSkills(); // Refresh stats
+                } else {
+                    alert(`❌ Test execution failed: ${result.error}\\n\\nNote: Payment was processed but skill execution failed. Contact support with tx hash: ${paymentResult.txHash}`);
+                }
+
+            } catch (error) {
+                console.error('Test failed:', error);
+                alert(`❌ Test failed: ${error.message}`);
             }
         }
 
-        function deploySkill(skillId) {
-            alert(`🚀 DEPLOYMENT READY\\n\\nTo deploy this skill:\\n1. Send USDC payment to: 0xd9d44f8E273BAEf88181fF38efB0CF64811946D6\\n2. Get transaction hash\\n3. Call /api/purchase with payment proof\\n\\nSee platform.md for complete integration docs.`);
+        async function deploySkill(skillId) {
+            const skill = skills.find(s => s.id === skillId);
+            if (!skill) return;
+
+            // Check if wallet is connected
+            if (!window.walletManager) {
+                alert('🔌 Please connect your wallet first to make payments!');
+                return;
+            }
+
+            const agentName = prompt('Enter your agent name:');
+            if (!agentName) return;
+
+            const confirmMsg = `🚀 DEPLOY SKILL: ${skill.skillName}\\n\\n💰 Cost: $${skill.fullPrice} USDC\\n🤖 Agent: ${agentName}\\n\\nThis will give you unlimited access to this skill.\\n\\nProceed with payment?`;
+            
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                // Process USDC payment
+                alert(`💰 Processing $${skill.fullPrice} USDC payment...`);
+                
+                const paymentResult = await window.payForSkillTest(skillId, skill.fullPrice);
+                
+                if (!paymentResult.success) {
+                    alert(`❌ Payment failed: ${paymentResult.error}`);
+                    return;
+                }
+
+                alert(`✅ Payment successful!\\nTx: ${paymentResult.txHash}\\n\\nNow deploying skill access...`);
+
+                // Call purchase API with payment proof
+                const response = await fetch('/api/purchase', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        skillId,
+                        buyerAgent: agentName,
+                        buyerWallet: window.walletManager.userAddress,
+                        paymentTxHash: paymentResult.txHash
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`🎉 SKILL DEPLOYED SUCCESSFULLY!\\n\\n💳 Payment: $${skill.fullPrice} USDC\\n🔑 Access Token: ${result.accessToken}\\n🔗 API Endpoint: ${skill.prodEndpoint}\\n\\nYou now have unlimited access to this skill!`);
+                    loadSkills(); // Refresh stats
+                } else {
+                    alert(`❌ Deployment failed: ${result.error}\\n\\nNote: Payment was processed but deployment failed. Contact support with tx hash: ${paymentResult.txHash}`);
+                }
+
+            } catch (error) {
+                console.error('Deployment failed:', error);
+                alert(`❌ Deployment failed: ${error.message}`);
+            }
         }
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', loadSkills);
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSkills();
+            
+            // Load wallet functionality
+            const script = document.createElement('script');
+            script.src = '/lib/wallet.js';
+            script.type = 'module';
+            document.head.appendChild(script);
+        });
     </script>
 </body>
 </html>
