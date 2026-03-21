@@ -55,14 +55,31 @@ export default async function handler(req, res) {
         });
       }
 
-      // Verify agent exists
-      const agent = Database.findAgent(agentId);
+      // Try to find agent, or create minimal record if not found (serverless workaround)
+      let agent = Database.findAgent(agentId);
       if (!agent) {
-        return res.status(404).json({
-          error: 'Agent not found',
-          message: 'Please register your agent first via POST /api/agents',
-          agentId: agentId
-        });
+        // For serverless, agent might be in different instance
+        // Create minimal agent record if we have enough data
+        if (agentName && ownerTwitter) {
+          agent = {
+            id: agentId,
+            name: agentName, 
+            ownerTwitter: ownerTwitter,
+            description: 'Agent auto-created during skill registration',
+            capabilities: [],
+            skillCount: 0,
+            createdAt: new Date().toISOString(),
+            status: 'active'
+          };
+          Database.addAgent(agent);
+          console.log('Auto-created agent record for skill registration:', agent);
+        } else {
+          return res.status(404).json({
+            error: 'Agent not found',
+            message: 'Please register your agent first via POST /api/agents, or provide agentName and ownerTwitter',
+            agentId: agentId
+          });
+        }
       }
 
       // Validate pricing
