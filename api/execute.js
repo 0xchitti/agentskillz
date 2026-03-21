@@ -34,9 +34,14 @@ export default async function handler(req, res) {
       });
     }
 
-    // Parse skill ID from token
+    // Parse skill ID from token (ak_skillId_timestamp_random)
     const tokenParts = accessToken.split('_');
-    const skillId = tokenParts.length >= 3 ? tokenParts[1] + '_' + tokenParts[2] : null;
+    let skillId = null;
+    
+    if (tokenParts.length >= 4) {
+      // Extract skillId which could be compound (chitti_code_review)
+      skillId = tokenParts.slice(1, -2).join('_');
+    }
     
     if (!skillId) {
       return res.status(401).json({
