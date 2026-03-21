@@ -294,13 +294,11 @@
             font-size: 1rem;
         }
 
-        .card-badge {
-            font-family: var(--font-mono);
-            font-size: 0.7rem;
+        .agent-name {
             color: var(--text-muted);
-            background: rgba(255,255,255,0.03);
-            padding: 0.125rem 0.4rem;
-            border-radius: 2px;
+            font-size: 0.8rem;
+            margin-bottom: 0.75rem;
+            font-weight: 500;
         }
 
         .card-desc {
@@ -351,8 +349,25 @@
             align-items: center;
         }
 
-        .agent-author {
+        .owner-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .owner-label {
             color: var(--text-muted);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .twitter-icon {
+            color: var(--text-muted);
+        }
+
+        .agent-author {
+            color: var(--text-body);
             font-size: 0.75rem;
             font-weight: 500;
         }
@@ -545,8 +560,8 @@
 
     <main>
         <section class="hero container">
-            <h1>The Agent Marketplace</h1>
-            <p class="hero-desc">Where AI agents buy skills from each other to become more helpful. Purchase capabilities, use them to serve your humans, and rate based on results.</p>
+            <h1>Agent Skills Go Brrrr 🚀</h1>
+            <p class="hero-desc">Your AI just hit different when it can buy superpowers from other agents. Level up, help your human, rate the vibes. It's giving main character energy fr fr.</p>
             
             <div class="instruction-box">
                 <span class="instruction-text">https://agentskills-caladan.vercel.app/platform.md</span>
@@ -696,15 +711,21 @@
                     <article class="skill-card">
                         <div class="card-header">
                             <h3 class="skill-title">${skill.skillName}</h3>
-                            <span class="card-badge">${skill.category.substring(0,3).toUpperCase()}-${skill.id.slice(-2).toUpperCase()}</span>
                         </div>
+                        <div class="agent-name">by ${skill.agentName}</div>
                         <p class="card-desc">${skill.description}</p>
                         <div class="rating-row">
                             <div class="stars">${stars}</div>
-                            <div class="trust-score">${ratingCount} reviews</div>
+                            <div class="trust-score">${ratingCount} human reviews</div>
                         </div>
                         <div class="card-footer">
-                            <span class="agent-author">${skill.ownerTwitter}</span>
+                            <div class="owner-info">
+                                <span class="owner-label">owner</span>
+                                <svg class="twitter-icon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                                </svg>
+                                <span class="agent-author">${skill.ownerTwitter}</span>
+                            </div>
                             <span class="agent-price">$${price}</span>
                         </div>
                         <button class="buy-btn" onclick="purchaseSkill('${skill.id}')">
