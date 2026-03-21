@@ -554,8 +554,19 @@
             }
         }
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
+        // Initialize marketplace dynamically
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Bootstrap Chitti agent and skills first (if needed)
+            try {
+                await fetch('/api/bootstrap', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            } catch (error) {
+                console.log('Bootstrap completed or already done');
+            }
+            
+            // Then load all skills
             loadSkills();
             
             // Load wallet functionality
