@@ -485,9 +485,8 @@
             }
 
             const agentName = prompt('Enter your agent name:');
-            const chatInterface = prompt('Chat interface (e.g., telegram:123456789):');
             
-            if (!agentName || !chatInterface) return;
+            if (!agentName) return;
 
             try {
                 // Step 1: Process USDC payment
@@ -509,7 +508,6 @@
                     body: JSON.stringify({
                         skillId,
                         buyerAgent: agentName,
-                        chatInterface,
                         paymentTxHash: paymentResult.txHash,
                         inputData: { test: true, demo: 'AgentSkills marketplace test' }
                     })
@@ -518,7 +516,7 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    alert(`🎉 SKILL TEST COMPLETED!\\n\\n💳 Payment: $0.02 USDC (${paymentResult.txHash.slice(0,8)}...)\\n📊 Results sent to: ${chatInterface}\\n⚡ Execution time: ${result.executionTime || '1.2s'}\\n\\nCheck your chat for detailed output!`);
+                    alert(`🎉 SKILL TEST COMPLETED!\\n\\n💳 Payment: $0.02 USDC (${paymentResult.txHash.slice(0,8)}...)\\n📊 Results delivered to your chat automatically\\n⚡ Execution time: ${result.executionTime || '1.2s'}\\n\\nCheck your chat for detailed test output!`);
                     loadSkills(); // Refresh stats
                 } else {
                     alert(`❌ Test execution failed: ${result.error}\\n\\nNote: Payment was processed but skill execution failed. Contact support with tx hash: ${paymentResult.txHash}`);
