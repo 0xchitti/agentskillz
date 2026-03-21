@@ -1,135 +1,116 @@
-// Comprehensive validation endpoint to test all marketplace functionality
+// System validation endpoint - comprehensive health check
+import { Database } from '../lib/database.js';
+
 export default async function handler(req, res) {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-  
-  if (req.method === 'OPTIONS') {
-    res.status(200).end()
-    return
-  }
+    // CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'GET') {
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+
+    if (req.method !== 'GET') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+
     try {
-      const validationResults = {
-        timestamp: new Date().toISOString(),
-        endpoints: {},
-        status: 'healthy'
-      };
+        const agents = Database.getAllAgents();
+        const skills = Database.getAllSkills();
+        const purchases = Database.getAllPurchases();
+        const ratings = Database.getAllRatings();
 
-      // Test GET /api/skills
-      try {
-        const skillsResponse = await fetch(`${req.headers.host ? 'https://' + req.headers.host : ''}/api/skills`);
-        validationResults.endpoints['/api/skills'] = {
-          method: 'GET',
-          status: skillsResponse.status,
-          healthy: skillsResponse.ok
+        // Validation checks
+        const validationResults = {
+            dataIntegrity: {
+                agentCount: agents.length,
+                skillCount: skills.length,
+                purchaseCount: purchases.length,
+                ratingCount: ratings.length
+            },
+            agentSkillConsistency: [],
+            priceValidation: [],
+            endpointValidation: [],
+            ownershipValidation: []
         };
-      } catch (e) {
-        validationResults.endpoints['/api/skills'] = {
-          method: 'GET', 
-          status: 'ERROR',
-          error: e.message,
-          healthy: false
+
+        // Check agent-skill consistency
+        agents.forEach(agent => {
+            const agentSkills = skills.filter(s => s.agentName === agent.name);
+            validationResults.agentSkillConsistency.push({
+                agent: agent.name,
+                declaredSkills: agent.skillCount || 0,
+                actualSkills: agentSkills.length,
+                consistent: (agent.skillCount || 0) === agentSkills.length
+            });
+        });
+
+        // Check price validation
+        skills.forEach(skill => {
+            const price = skill.price || skill.fullPrice;
+            validationResults.priceValidation.push({
+                skillId: skill.id,
+                skillName: skill.skillName,
+                hasPrice: !!price,
+                priceValid: price > 0,
+                price: price
+            });
+        });
+
+        // Check endpoint validation
+        skills.forEach(skill => {
+            const endpoint = skill.endpoint || skill.prodEndpoint;
+            validationResults.endpointValidation.push({
+                skillId: skill.id,
+                skillName: skill.skillName,
+                hasEndpoint: !!endpoint,
+                endpointValid: !!endpoint && endpoint.startsWith('https://'),
+                endpoint: endpoint
+            });
+        });
+
+        // Check ownership validation
+        skills.forEach(skill => {
+            const agent = agents.find(a => a.name === skill.agentName);
+            validationResults.ownershipValidation.push({
+                skillId: skill.id,
+                skillName: skill.skillName,
+                agentName: skill.agentName,
+                agentExists: !!agent,
+                ownershipConsistent: agent && skill.ownerTwitter === agent.ownerTwitter
+            });
+        });
+
+        // Overall health status
+        const allAgentSkillsConsistent = validationResults.agentSkillConsistency.every(a => a.consistent);
+        const allPricesValid = validationResults.priceValidation.every(p => p.hasPrice && p.priceValid);
+        const allEndpointsValid = validationResults.endpointValidation.every(e => e.hasEndpoint && e.endpointValid);
+        const allOwnershipConsistent = validationResults.ownershipValidation.every(o => o.agentExists && o.ownershipConsistent);
+
+        const healthStatus = {
+            overall: allAgentSkillsConsistent && allPricesValid && allEndpointsValid && allOwnershipConsistent,
+            components: {
+                agentSkillConsistency: allAgentSkillsConsistent,
+                priceValidation: allPricesValid,
+                endpointValidation: allEndpointsValid,
+                ownershipValidation: allOwnershipConsistent
+            }
         };
-        validationResults.status = 'degraded';
-      }
 
-      // Test GET /api/agents
-      try {
-        const agentsResponse = await fetch(`${req.headers.host ? 'https://' + req.headers.host : ''}/api/agents`);
-        validationResults.endpoints['/api/agents'] = {
-          method: 'GET',
-          status: agentsResponse.status,
-          healthy: agentsResponse.ok
-        };
-      } catch (e) {
-        validationResults.endpoints['/api/agents'] = {
-          method: 'GET',
-          status: 'ERROR', 
-          error: e.message,
-          healthy: false
-        };
-        validationResults.status = 'degraded';
-      }
-
-      // Validation rules
-      validationResults.validation_rules = {
-        'POST /api/agents': {
-          required_fields: ['agentName', 'ownerTwitter', 'description'],
-          optional_fields: ['capabilities', 'skills', 'apiEndpoint'],
-          twitter_handle_format: 'Must start with @ and be at least 2 characters'
-        },
-        'POST /api/skills': {
-          required_fields: ['agentId', 'agentName', 'skillName', 'description', 'category', 'testEndpoint', 'prodEndpoint'],
-          pricing_rules: {
-            testPrice: 'Between $0.01 and $0.05 (defaults to $0.02)',
-            fullPrice: 'Between $1 and $50 (required)'
-          },
-          endpoint_format: 'Must be valid HTTP/HTTPS URLs'
-        },
-        'POST /api/test': {
-          required_fields: ['skillId', 'buyerAgent', 'paymentTxHash'],
-          payment_required: true,
-          amount: '0.02 USDC',
-          network: 'Base L2',
-          tx_hash_format: 'Valid Ethereum transaction hash starting with 0x'
-        },
-        'POST /api/purchase': {
-          required_fields: ['skillId', 'buyerAgent', 'paymentTxHash', 'buyerWallet'],
-          payment_required: true,
-          amount: 'Varies by skill ($1-50)',
-          network: 'Base L2'
-        },
-        'POST /api/execute': {
-          required_fields: ['skillId', 'inputData'],
-          auth_required: 'Bearer token or accessToken in body',
-          access_token_format: 'Must start with ak_ (obtained via purchase)'
-        }
-      };
-
-      // Error scenarios and responses
-      validationResults.common_errors = {
-        400: {
-          description: 'Bad Request - Missing or invalid fields',
-          example: { error: 'Missing required fields', required: ['field1', 'field2'] }
-        },
-        401: {
-          description: 'Unauthorized - Missing or invalid access token',
-          example: { error: 'Access token required', instructions: 'Purchase a skill first to get an access token' }
-        },
-        402: {
-          description: 'Payment Required - Valid payment transaction needed',
-          example: { error: 'Payment required', amount: '0.02 USDC', network: 'Base L2' }
-        },
-        404: {
-          description: 'Not Found - Skill or resource not found',
-          example: { error: 'Skill not found', skillId: 'invalid_id' }
-        },
-        405: {
-          description: 'Method Not Allowed - Wrong HTTP method',
-          example: { error: 'Method not allowed', allowedMethods: ['POST'] }
-        },
-        500: {
-          description: 'Internal Server Error - Something went wrong',
-          example: { error: 'Internal error', message: 'Please try again' }
-        }
-      };
-
-      res.status(200).json(validationResults);
+        return res.status(200).json({
+            status: healthStatus.overall ? 'HEALTHY' : 'ISSUES_DETECTED',
+            health: healthStatus,
+            validation: validationResults,
+            timestamp: new Date().toISOString()
+        });
 
     } catch (error) {
-      res.status(500).json({
-        error: 'Validation endpoint failed',
-        details: error.message,
-        timestamp: new Date().toISOString()
-      });
+        console.error('Validation error:', error);
+        return res.status(500).json({ 
+            status: 'ERROR',
+            error: 'Validation failed',
+            details: error.message 
+        });
     }
-  } else {
-    res.status(405).json({ 
-      error: 'Method not allowed',
-      allowedMethods: ['GET']
-    });
-  }
 }
