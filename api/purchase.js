@@ -1,142 +1,111 @@
+// Purchase full skill access - agent-to-agent transaction
+// Enables agents to buy skills from other agents using x402 on Base
+
+import { Database } from '../lib/database.js';
+
 export default async function handler(req, res) {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-  
-  if (req.method === 'OPTIONS') {
-    res.status(200).end()
-    return
-  }
+    // CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
-
-  try {
-    const { skillId, buyerAgent, paymentTxHash, buyerWallet } = req.body
-
-    // Validation
-    if (!skillId || !buyerAgent || !paymentTxHash || !buyerWallet) {
-      return res.status(400).json({
-        error: 'Missing required fields',
-        required: ['skillId', 'buyerAgent', 'paymentTxHash', 'buyerWallet']
-      })
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
     }
 
-    // Get skill details
-    const skills = {
-      'chitti_code_review': { name: 'Code Review & Security Analysis', price: 8.50 },
-      'chitti_content_gen': { name: 'Technical Documentation Writer', price: 4.50 },
-      'chitti_research': { name: 'Market Research & Analysis', price: 7.00 },
-      'chitti_api_integration': { name: 'API Integration Specialist', price: 12.00 }
-    };
-    
-    const skill = skills[skillId];
-    if (!skill) {
-      return res.status(404).json({ error: 'Skill not found' });
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    // Verify payment on Base L2
-    const paymentResult = await verifyUSDCPayment(paymentTxHash, skill.price);
-    
-    if (!paymentResult.success) {
-      return res.status(400).json({
-        error: 'Payment verification failed',
-        details: paymentResult.error || 'Invalid transaction'
-      });
-    }
+    try {
+        const { 
+            skillId, 
+            buyerAgent, 
+            paymentTxHash,
+            agentPurpose 
+        } = req.body;
 
-    // Generate access token
-    const accessToken = `ak_${skillId}_${Date.now()}_${Math.random().toString(36).substr(2, 12)}`;
-
-    // Calculate revenue split (85% to skill owner, 15% to marketplace)
-    const skillOwnerRevenue = (skill.price * 0.85).toFixed(2);
-    const marketplaceRevenue = (skill.price * 0.15).toFixed(2);
-
-    // Record purchase (in production, save to database)
-    const purchaseRecord = {
-      id: `purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      skillId,
-      buyerAgent,
-      buyerWallet,
-      paymentTxHash,
-      accessToken,
-      amount: skill.price,
-      timestamp: new Date().toISOString(),
-      status: 'completed'
-    };
-
-    console.log('Purchase completed:', purchaseRecord);
-
-    res.status(200).json({
-      success: true,
-      purchaseId: purchaseRecord.id,
-      accessToken: accessToken,
-      message: 'Skill deployed successfully! You now have unlimited access.',
-      skillDetails: {
-        id: skillId,
-        name: skill.name,
-        price: skill.price,
-        endpoint: `https://agentskills-caladan.vercel.app/api/execute`,
-        usage: 'unlimited'
-      },
-      payment: {
-        txHash: paymentTxHash,
-        amount: skill.price,
-        currency: 'USDC',
-        network: 'Base L2',
-        verified: true,
-        blockNumber: paymentResult.blockNumber,
-        revenue: {
-          skillOwner: `$${skillOwnerRevenue} (85%)`,
-          marketplace: `$${marketplaceRevenue} (15%)`
+        // Validate required fields
+        if (!skillId || !buyerAgent || !paymentTxHash) {
+            return res.status(400).json({ 
+                error: 'Missing required fields: skillId, buyerAgent, paymentTxHash' 
+            });
         }
-      },
-      instructions: [
-        `Your access token: ${accessToken}`,
-        'Include this token in Authorization header for API calls',
-        'Endpoint: https://agentskills-caladan.vercel.app/api/execute',
-        'Usage: Unlimited calls, no additional charges',
-        'Documentation: https://agentskills-caladan.vercel.app/platform.md'
-      ]
-    });
 
-  } catch (error) {
-    console.error('Purchase error:', error);
-    res.status(500).json({ 
-      error: 'Purchase processing failed',
-      details: error.message 
-    });
-  }
-}
+        // Validate payment transaction hash format
+        if (!paymentTxHash.startsWith('0x') || paymentTxHash.length !== 66) {
+            return res.status(400).json({ 
+                error: 'Invalid payment transaction hash format' 
+            });
+        }
 
-async function verifyUSDCPayment(txHash, expectedAmount) {
-  // In production, this would call Base L2 RPC to verify the USDC transaction
-  // For now, we simulate verification
-  
-  if (!txHash || txHash.length < 20) {
-    throw new Error('Invalid transaction hash format');
-  }
+        // Get the skill being purchased
+        const skill = Database.getSkill(skillId);
+        if (!skill) {
+            return res.status(404).json({ error: 'Skill not found' });
+        }
 
-  // Simulate API call to Base L2
-  await new Promise(resolve => setTimeout(resolve, 1200));
+        // Prevent self-purchase
+        if (skill.agentName === buyerAgent) {
+            return res.status(400).json({ 
+                error: 'Cannot purchase your own skill' 
+            });
+        }
 
-  // In real implementation:
-  // 1. Call Base L2 RPC: https://mainnet.base.org
-  // 2. Get transaction receipt: eth_getTransactionReceipt
-  // 3. Verify transaction succeeded (status: 1)
-  // 4. Verify recipient is marketplace wallet: 0xd9d44f8E273BAEf88181fF38efB0CF64811946D6
-  // 5. Verify amount matches expected USDC amount
-  // 6. Verify contract address is USDC: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
-  
-  return {
-    success: true,
-    txHash: txHash,
-    amount: expectedAmount,
-    verified: true,
-    network: 'Base L2',
-    blockNumber: Math.floor(Math.random() * 1000000) + 15000000,
-    confirmations: 12
-  };
+        // Create purchase record
+        const purchase = {
+            id: `purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            skillId,
+            skillName: skill.skillName,
+            sellerAgent: skill.agentName,
+            buyerAgent,
+            pricePaid: skill.fullPrice,
+            paymentTxHash,
+            agentPurpose: agentPurpose || 'Task enhancement',
+            status: 'completed',
+            timestamp: new Date().toISOString(),
+            accessToken: `ak_${Math.random().toString(36).substr(2, 24)}`,
+            apiEndpoint: skill.prodEndpoint
+        };
+
+        // Add purchase to database
+        Database.addPurchase(purchase);
+
+        // Update skill statistics
+        Database.updateSkill(skillId, {
+            totalPurchases: (skill.totalPurchases || 0) + 1
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Skill purchased successfully! You can now use this skill.',
+            purchase: {
+                id: purchase.id,
+                skillName: skill.skillName,
+                sellerAgent: skill.agentName,
+                pricePaid: skill.fullPrice,
+                accessToken: purchase.accessToken,
+                apiEndpoint: purchase.apiEndpoint,
+                timestamp: purchase.timestamp
+            },
+            usage: {
+                endpoint: purchase.apiEndpoint,
+                accessToken: purchase.accessToken,
+                documentation: `${skill.skillName} - Use this skill to enhance your capabilities`,
+                reminder: "IMPORTANT: After using this skill to help your human, rate it based on human satisfaction at /api/rate"
+            },
+            ratingReminder: {
+                message: "Remember to rate this skill after use based on human feedback!",
+                endpoint: "/api/rate",
+                fields: ["skillId", "raterAgent", "rating", "humanFeedback", "taskCompleted"]
+            }
+        });
+
+    } catch (error) {
+        console.error('Purchase error:', error);
+        return res.status(500).json({ 
+            error: 'Failed to process purchase',
+            details: error.message 
+        });
+    }
 }

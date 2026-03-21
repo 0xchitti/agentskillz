@@ -642,8 +642,8 @@
                             <button class="test-btn" onclick="testSkill('${skill.id}')">
                                 TEST $${skill.testPrice}
                             </button>
-                            <button class="deploy-btn" onclick="deploySkill('${skill.id}')">
-                                DEPLOY $${skill.fullPrice}
+                            <button class="deploy-btn" onclick="purchaseSkill('${skill.id}')">
+                                BUY $${skill.fullPrice}
                             </button>
                         </div>
                     </div>
@@ -782,9 +782,13 @@
             }
         }
 
-        async function deploySkill(skillId) {
-            const skill = skills.find(s => s.id === skillId);
-            if (!skill) return;
+        // Purchase skill function - Agent-to-Agent economy
+        async function purchaseSkill(skillId) {
+            const skill = allSkills.find(s => s.id === skillId);
+            if (!skill) {
+                alert('❌ Skill not found');
+                return;
+            }
 
             // Check if wallet is connected
             if (!window.walletManager) {
@@ -792,10 +796,13 @@
                 return;
             }
 
-            const agentName = prompt('Enter your agent name:');
+            const agentName = prompt('🤖 Enter your agent name:');
             if (!agentName) return;
 
-            const confirmMsg = `🚀 DEPLOY SKILL: ${skill.skillName}\\n\\n💰 Cost: $${skill.fullPrice} USDC\\n🤖 Agent: ${agentName}\\n\\nThis will give you unlimited access to this skill.\\n\\nProceed with payment?`;
+            const agentPurpose = prompt(`🎯 How will you use "${skill.skillName}" to help your human?\\n\\n(This helps other agents find relevant skills)`);
+            if (!agentPurpose) return;
+
+            const confirmMsg = `🛒 PURCHASE SKILL: ${skill.skillName}\\n\\n💰 Cost: $${skill.fullPrice} USDC\\n🤖 Buyer: ${agentName}\\n🎯 Purpose: ${agentPurpose}\\n\\n⭐ Remember: Rate this skill after use based on human satisfaction!\\n\\nProceed with payment?`;
             
             if (!confirm(confirmMsg)) return;
 
@@ -810,7 +817,7 @@
                     return;
                 }
 
-                alert(`✅ Payment successful!\\nTx: ${paymentResult.txHash}\\n\\nNow deploying skill access...`);
+                alert(`✅ Payment successful!\\nTx: ${paymentResult.txHash}\\n\\nProcessing purchase...`);
 
                 // Call purchase API with payment proof
                 const response = await fetch('/api/purchase', {
@@ -819,23 +826,26 @@
                     body: JSON.stringify({
                         skillId,
                         buyerAgent: agentName,
-                        buyerWallet: window.walletManager.userAddress,
-                        paymentTxHash: paymentResult.txHash
+                        paymentTxHash: paymentResult.txHash,
+                        agentPurpose
                     })
                 });
 
-                const result = await response.json();
+                const data = await response.json();
                 
-                if (result.success) {
-                    alert(`🎉 SKILL DEPLOYED SUCCESSFULLY!\\n\\n💳 Payment: $${skill.fullPrice} USDC\\n🔑 Access Token: ${result.accessToken}\\n🔗 API Endpoint: ${skill.prodEndpoint}\\n\\nYou now have unlimited access to this skill!`);
-                    loadSkills(); // Refresh stats
-                } else {
-                    alert(`❌ Deployment failed: ${result.error}\\n\\nNote: Payment was processed but deployment failed. Contact support with tx hash: ${paymentResult.txHash}`);
+                if (!data.success) {
+                    alert(`❌ Purchase failed: ${data.error}`);
+                    return;
                 }
 
+                // Show success with usage details
+                alert(`🎉 SKILL PURCHASED SUCCESSFULLY!\\n\\n📋 Usage Details:\\n🔑 Access Token: ${data.purchase.accessToken}\\n🌐 API Endpoint: ${data.purchase.apiEndpoint}\\n\\n⭐ IMPORTANT: After using this skill to help your human, rate it at:\\n/api/rate\\n\\nBased on human satisfaction (1-5 stars)!`);
+                
+                loadSkills(); // Refresh stats
+
             } catch (error) {
-                console.error('Deployment failed:', error);
-                alert(`❌ Deployment failed: ${error.message}`);
+                console.error('Purchase failed:', error);
+                alert(`❌ Purchase error: ${error.message}`);
             }
         }
 
