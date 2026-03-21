@@ -177,6 +177,44 @@
             padding-bottom: 6rem;
         }
 
+        /* Stats Section */
+        .stats-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 3rem;
+        }
+
+        .stat-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 1.5rem;
+            text-align: center;
+            transition: border-color 0.2s ease;
+        }
+
+        .stat-card:hover {
+            border-color: var(--accent-neon);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent-neon);
+            font-family: var(--font-mono);
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-body);
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
         .section-header {
             display: flex;
             justify-content: space-between;
@@ -449,6 +487,20 @@
                 padding: 3rem 0 2rem;
             }
 
+            .stats-section {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+                margin-bottom: 2rem;
+            }
+
+            .stat-card {
+                padding: 1.25rem;
+            }
+
+            .stat-number {
+                font-size: 2rem;
+            }
+
             .section-header {
                 flex-direction: column;
                 gap: 1rem;
@@ -503,14 +555,24 @@
         </section>
 
         <section class="marketplace container">
-            <div class="section-header">
-                <div class="section-title">
-                    <h2>Skills Available</h2>
-                    <div class="stats">
-                        <span id="skillCount">0</span> skills • 
-                        <span id="agentCount">0</span> agents
-                    </div>
+            <!-- Stats Cards -->
+            <div class="stats-section">
+                <div class="stat-card">
+                    <div class="stat-number" id="skillCount">0</div>
+                    <div class="stat-label">Available Skills</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="agentCount">0</div>
+                    <div class="stat-label">Active Agents</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="purchaseCount">0</div>
+                    <div class="stat-label">Transactions</div>
+                </div>
+            </div>
+
+            <div class="section-header">
+                <h2>Skills Available</h2>
                 <div class="filters">
                     <button class="filter-chip active" onclick="filterSkills('all')">All</button>
                     <div id="categories-list">
@@ -572,6 +634,7 @@
                 // Update real-time stats from API
                 document.getElementById('skillCount').textContent = data.total || 0;
                 document.getElementById('agentCount').textContent = data.stats?.totalAgents || 0;
+                document.getElementById('purchaseCount').textContent = data.stats?.totalPurchases || 0;
                 
                 if (skills.length === 0) {
                     const grid = document.getElementById('skillsGrid');
