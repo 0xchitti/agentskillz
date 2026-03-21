@@ -1,5 +1,5 @@
-// Rate a skill based on usage experience
-// Called after an agent uses a skill to complete a human task
+// Outcome-based skill rating after real usage
+// Only allows reviews after minimum usage threshold (5+ uses OR 7+ days)
 
 import { Database } from '../lib/database.js';
 
@@ -19,78 +19,128 @@ export default async function handler(req, res) {
 
     try {
         const { 
-            skillId, 
-            raterAgent, 
-            rating, 
-            humanFeedback,
-            taskCompleted,
-            usageNotes 
+            purchaseId, 
+            evidence,
+            dimensions,
+            rationale 
         } = req.body;
 
         // Validate required fields
-        if (!skillId || !raterAgent || rating === undefined) {
+        if (!purchaseId || !evidence || !dimensions || !rationale) {
             return res.status(400).json({ 
-                error: 'Missing required fields: skillId, raterAgent, rating' 
+                error: 'Purchase ID, evidence, dimensions, and rationale required' 
             });
         }
 
-        // Validate rating range (1-5 stars)
-        if (rating < 1 || rating > 5) {
+        // Find the purchase record
+        const purchase = Database.findPurchase(purchaseId);
+        if (!purchase) {
+            return res.status(404).json({ error: 'Purchase not found' });
+        }
+
+        // Check usage threshold eligibility
+        const { usageCount, daysActive } = evidence;
+        const isEligible = usageCount >= 5 || daysActive >= 7;
+        
+        if (!isEligible) {
             return res.status(400).json({ 
-                error: 'Rating must be between 1 and 5' 
+                error: 'Minimum usage threshold not met (5+ uses OR 7+ days)' 
             });
         }
 
-        // Get the skill being rated
-        const skill = Database.getSkill(skillId);
-        if (!skill) {
-            return res.status(404).json({ error: 'Skill not found' });
+        // Validate dimensions (0-10 scale internally)
+        const { humanUsefulness, outcomeQuality, realWorldValue, friction, harmFailure } = dimensions;
+        
+        if (!Number.isInteger(humanUsefulness) || humanUsefulness < 0 || humanUsefulness > 10 ||
+            !Number.isInteger(outcomeQuality) || outcomeQuality < 0 || outcomeQuality > 10 ||
+            !Number.isInteger(realWorldValue) || realWorldValue < 0 || realWorldValue > 10 ||
+            !Number.isInteger(friction) || friction < 0 || friction > 10 ||
+            !Number.isInteger(harmFailure) || harmFailure < 0 || harmFailure > 10) {
+            return res.status(400).json({ 
+                error: 'All dimension scores must be integers between 0-10' 
+            });
         }
 
-        // Create rating record
-        const ratingRecord = {
-            id: `rating_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            skillId,
-            skillName: skill.skillName,
-            sellerAgent: skill.agentName,
-            raterAgent,
-            rating: Number(rating),
-            humanFeedback: humanFeedback || '',
-            taskCompleted: taskCompleted || false,
-            usageNotes: usageNotes || '',
+        // Calculate weighted internal score
+        const weightedScore = (
+            humanUsefulness * 0.40 +
+            outcomeQuality * 0.25 +
+            realWorldValue * 0.20 +
+            friction * 0.10 +
+            harmFailure * 0.05
+        ) * 10; // Scale to 0-100
+
+        // Convert to star rating
+        let starRating;
+        if (weightedScore >= 90) starRating = 5;
+        else if (weightedScore >= 75) starRating = 4;
+        else if (weightedScore >= 55) starRating = 3;
+        else if (weightedScore >= 35) starRating = 2;
+        else starRating = 1;
+
+        // Determine confidence level
+        let confidence = 'high';
+        if (usageCount < 10 && daysActive < 14) confidence = 'medium';
+        if (usageCount < 3 || daysActive < 3) confidence = 'low';
+
+        // Anti-gaming checks
+        const recentReviews = Database.getRecentReviewsByAgent(purchase.buyerAgent, 24); // Last 24 hours
+        if (recentReviews && recentReviews.length > 5) {
+            confidence = 'low'; // Burst detection
+        }
+
+        // Create review record
+        const reviewRecord = {
+            id: `review_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            purchaseId,
+            skillId: purchase.skillId,
+            buyerAgent: purchase.buyerAgent,
+            
+            // Final output
+            rating: starRating,
+            confidence,
+            
+            // Evidence
+            usageCount: evidence.usageCount,
+            daysActive: evidence.daysActive,
+            humanAdoptionSignal: evidence.humanAdoptionSignal || '',
+            timeSavedEstimate: evidence.timeSavedEstimate || null,
+            correctionCount: evidence.correctionCount || 0,
+            harmFlag: evidence.harmFlag || false,
+            
+            // Internal scoring
+            dimensions: {
+                humanUsefulness,
+                outcomeQuality, 
+                realWorldValue,
+                friction,
+                harmFailure
+            },
+            weightedScore,
+            
+            rationale,
             timestamp: new Date().toISOString()
         };
 
-        // Add rating to database
-        Database.addRating(ratingRecord);
+        Database.addRating(reviewRecord);
 
-        // Update skill's average rating and rating count
-        const allRatings = Database.getRatingsForSkill(skillId);
-        const avgRating = allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length;
-        
-        // Update skill with new rating stats
-        Database.updateSkill(skillId, {
-            rating: Number(avgRating.toFixed(1)),
-            ratingCount: allRatings.length,
-            totalTests: skill.totalTests + 1 // Increment usage count
-        });
+        // Update skill's average rating (only high/medium confidence reviews)
+        Database.updateSkillRating(purchase.skillId);
 
-        return res.status(200).json({
+        res.json({
             success: true,
-            message: 'Rating submitted successfully',
-            rating: ratingRecord,
-            skillStats: {
-                averageRating: Number(avgRating.toFixed(1)),
-                totalRatings: allRatings.length,
-                skillName: skill.skillName
-            },
-            timestamp: new Date().toISOString()
+            message: 'Outcome-based review submitted successfully',
+            reviewId: reviewRecord.id,
+            finalRating: starRating,
+            confidence,
+            weightedScore: Math.round(weightedScore),
+            eligibilityMet: true
         });
 
     } catch (error) {
-        console.error('Rating submission error:', error);
-        return res.status(500).json({ 
-            error: 'Failed to submit rating',
+        console.error('Review submission error:', error);
+        res.status(500).json({ 
+            error: 'Failed to submit review',
             details: error.message 
         });
     }
