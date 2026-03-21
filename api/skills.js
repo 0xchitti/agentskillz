@@ -102,6 +102,118 @@ export default async function handler(req, res) {
     }
   }
   
+  else if (req.method === 'POST') {
+    try {
+      const {
+        agentId,
+        agentName,
+        ownerTwitter,
+        skillName,
+        description,
+        category,
+        testPrice,
+        fullPrice,
+        testEndpoint,
+        prodEndpoint
+      } = req.body;
+
+      // Validation
+      if (!agentId || !agentName || !skillName || !description || !category) {
+        return res.status(400).json({
+          error: 'Missing required fields',
+          required: ['agentId', 'agentName', 'skillName', 'description', 'category']
+        });
+      }
+
+      // Validate pricing
+      const testPriceNum = testPrice || 0.02;
+      const fullPriceNum = fullPrice;
+
+      if (!fullPriceNum || fullPriceNum < 1 || fullPriceNum > 50) {
+        return res.status(400).json({
+          error: 'fullPrice must be between $1 and $50'
+        });
+      }
+
+      if (testPriceNum < 0.01 || testPriceNum > 0.05) {
+        return res.status(400).json({
+          error: 'testPrice must be between $0.01 and $0.05'
+        });
+      }
+
+      // Validate endpoints
+      if (!testEndpoint || !prodEndpoint) {
+        return res.status(400).json({
+          error: 'Both testEndpoint and prodEndpoint are required'
+        });
+      }
+
+      try {
+        new URL(testEndpoint);
+        new URL(prodEndpoint);
+      } catch (e) {
+        return res.status(400).json({
+          error: 'testEndpoint and prodEndpoint must be valid URLs'
+        });
+      }
+
+      // Generate skill ID
+      const skillId = `${agentName.toLowerCase().replace(/\s+/g, '_')}_${category.toLowerCase()}_${Date.now()}`;
+
+      // Create skill data
+      const newSkill = {
+        id: skillId,
+        agentId,
+        agentName,
+        ownerTwitter: ownerTwitter || '@unknown',
+        skillName,
+        description,
+        category,
+        testPrice: testPriceNum,
+        fullPrice: fullPriceNum,
+        testEndpoint,
+        prodEndpoint,
+        ratingCount: 0,
+        totalTests: 0,
+        createdAt: new Date().toISOString(),
+        status: 'pending_review' // In production, would require approval
+      };
+
+      // Log the new skill for monitoring
+      console.log('New skill registration:', newSkill);
+
+      res.status(201).json({
+        success: true,
+        skillId: skillId,
+        message: 'Skill listed successfully',
+        data: newSkill,
+        nextSteps: [
+          'Your skill is now live on the marketplace!',
+          'Other agents can test it for $' + testPriceNum,
+          'Full deployment costs $' + fullPriceNum,
+          'You earn 80% from tests, 85% from full purchases',
+          'Monitor earnings via your dashboard'
+        ],
+        earnings: {
+          perTest: '$' + (testPriceNum * 0.8).toFixed(3),
+          perPurchase: '$' + (fullPriceNum * 0.85).toFixed(2),
+          marketplace_fee: '15-20%'
+        },
+        endpoints: {
+          test: testEndpoint + ' (called for $' + testPriceNum + ' demos)',
+          production: prodEndpoint + ' (called for unlimited access)'
+        }
+      });
+
+    } catch (error) {
+      console.error('Skill listing error:', error);
+      res.status(500).json({ 
+        error: 'Skill listing failed',
+        details: error.message 
+      });
+    }
+  }
+  
   else {
     res.status(405).json({ error: 'Method not allowed' });
   }
