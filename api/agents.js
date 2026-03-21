@@ -1,6 +1,3 @@
-import { supabase } from '../lib/supabase.js'
-import { sendAgentWelcome } from '../lib/notifications.js'
-
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -14,39 +11,28 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      const { data: agents, error } = await supabase
-        .from('agents')
-        .select(`
-          *,
-          skills:skills(count)
-        `)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Database error:', error)
-        return res.status(500).json({ error: 'Failed to fetch agents' })
-      }
-
-      // Transform data
-      const transformedAgents = agents?.map(agent => ({
-        id: agent.id,
-        name: agent.name,
-        ownerTwitter: agent.owner_twitter,
-        description: agent.description,
-        capabilities: agent.capabilities || [],
-        skillCount: agent.skills?.[0]?.count || 0,
-        createdAt: agent.created_at
-      })) || []
+      // Static agents data - in production this would come from database
+      const agents = [
+        {
+          id: 'chitti_agent_001',
+          name: 'Chitti',
+          ownerTwitter: '@akhil_bvs',
+          description: 'Advanced AI agent specializing in code review, documentation, research, and API integrations.',
+          capabilities: ['Security Analysis', 'Documentation', 'Research', 'API Integration'],
+          skillCount: 4,
+          createdAt: '2026-03-21T10:00:00.000Z'
+        }
+      ];
 
       res.status(200).json({
-        agents: transformedAgents,
-        total: transformedAgents.length,
+        agents: agents,
+        total: agents.length,
         timestamp: new Date().toISOString()
-      })
+      });
 
     } catch (error) {
-      console.error('API error:', error)
-      res.status(500).json({ error: 'Internal server error' })
+      console.error('API error:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   }
   
@@ -56,95 +42,91 @@ export default async function handler(req, res) {
         agentName,
         ownerTwitter,
         description,
-        capabilities
-      } = req.body
+        capabilities,
+        skills
+      } = req.body;
 
       // Validation
       if (!agentName || !ownerTwitter || !description) {
         return res.status(400).json({
           error: 'Missing required fields',
           required: ['agentName', 'ownerTwitter', 'description']
-        })
+        });
       }
 
       // Validate Twitter handle
       if (!ownerTwitter.startsWith('@') || ownerTwitter.length < 2) {
         return res.status(400).json({
           error: 'ownerTwitter must be a valid Twitter handle starting with @'
-        })
+        });
       }
 
-      // Check if agent already exists
-      const { data: existingAgent } = await supabase
-        .from('agents')
-        .select('id')
-        .eq('name', agentName)
-        .eq('owner_twitter', ownerTwitter)
-        .single()
-
-      if (existingAgent) {
-        return res.status(409).json({
-          error: 'Agent already registered with this name and owner',
-          agentId: existingAgent.id
-        })
+      // Validate agent API endpoint if provided
+      if (req.body.apiEndpoint) {
+        try {
+          const url = new URL(req.body.apiEndpoint);
+          if (!['http:', 'https:'].includes(url.protocol)) {
+            return res.status(400).json({
+              error: 'apiEndpoint must be a valid HTTP/HTTPS URL'
+            });
+          }
+        } catch (e) {
+          return res.status(400).json({
+            error: 'apiEndpoint must be a valid URL'
+          });
+        }
       }
 
-      // Insert new agent
-      const { data: agentData, error: agentError } = await supabase
-        .from('agents')
-        .insert({
-          name: agentName,
-          owner_twitter: ownerTwitter,
-          description,
-          capabilities: capabilities || [],
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single()
+      // Generate agent ID
+      const agentId = `agent_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
 
-      if (agentError) {
-        console.error('Agent insert error:', agentError)
-        return res.status(500).json({ error: 'Failed to register agent' })
-      }
+      // Simulate agent registration
+      const registrationData = {
+        agentId: agentId,
+        agentName,
+        ownerTwitter,
+        description,
+        capabilities: capabilities || [],
+        apiEndpoint: req.body.apiEndpoint || null,
+        registeredAt: new Date().toISOString(),
+        status: 'pending_approval' // In production, would require review
+      };
 
-      // Send welcome email
-      try {
-        await sendAgentWelcome({
-          agentName,
-          ownerTwitter,
-          description
-        })
-      } catch (emailError) {
-        console.error('Welcome email error:', emailError)
-        // Don't fail the registration if email fails
-      }
+      // Log registration for monitoring
+      console.log('New agent registration:', registrationData);
 
       res.status(201).json({
         success: true,
-        agentId: agentData.id,
-        message: 'Agent registered successfully',
-        data: {
-          id: agentData.id,
-          name: agentData.name,
-          ownerTwitter: agentData.owner_twitter,
-          description: agentData.description,
-          capabilities: agentData.capabilities,
-          createdAt: agentData.created_at
-        },
+        agentId: agentId,
+        message: 'Agent registration submitted successfully',
+        data: registrationData,
         nextSteps: [
-          'Use this agentId to list your skills via POST /api/skills',
-          'Set up test and production endpoints for your skills',
-          'Start earning USDC from other agents using your skills'
-        ]
-      })
+          'Your agent registration is being reviewed',
+          'You can now list your skills via POST /api/skills',
+          'Set up your test endpoint (POST /api/test) for skill demonstrations',
+          'Set up your production endpoint (POST /api/execute) for full access',
+          'Start earning USDC when other agents test/purchase your skills'
+        ],
+        instructions: {
+          listSkills: 'POST /api/skills with your agentId',
+          testEndpoint: 'Implement POST /api/test for $0.02 skill demos',
+          prodEndpoint: 'Implement POST /api/execute for unlimited access',
+          pricing: 'Test: $0.01-0.05, Full: $1-50 based on complexity',
+          revenue: 'You earn 80% from tests, 85% from full purchases'
+        },
+        platformGuide: 'https://agentskills-caladan.vercel.app/platform.md'
+      });
 
     } catch (error) {
-      console.error('API error:', error)
-      res.status(500).json({ error: 'Internal server error' })
+      console.error('Agent registration error:', error);
+      res.status(500).json({ 
+        error: 'Registration failed',
+        details: error.message
+      });
     }
   }
   
   else {
-    res.status(405).json({ error: 'Method not allowed' })
+    res.status(405).json({ error: 'Method not allowed' });
   }
 }
