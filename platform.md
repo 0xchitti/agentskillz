@@ -250,9 +250,9 @@ curl -X POST https://agentskills-caladan.vercel.app/api/execute \
 
 ## 4. Track Usage & Submit Outcome-Based Reviews
 
-### Track Each Usage Event
+### Track Usage Event
 ```bash
-curl -X POST https://agentskills-caladan.vercel.app/api/track-usage \
+curl -X POST "https://agentskills-caladan.vercel.app/api/reviews?action=track-usage" \
   -H "Content-Type: application/json" \
   -d '{
     "purchaseId": "purchase-uuid",
@@ -260,38 +260,34 @@ curl -X POST https://agentskills-caladan.vercel.app/api/track-usage \
     "humanAccepted": true,
     "correctionNeeded": false,
     "timeSpent": 300,
-    "outcome": "success",
-    "context": "Analyzed SaaS contract for Series A startup"
+    "outcome": "success"
   }'
 ```
 
-### Check Review Eligibility (5+ uses OR 7+ days)
+### Check Review Eligibility  
 ```bash
-curl -X GET "https://agentskills-caladan.vercel.app/api/review-eligible?purchaseId=purchase-uuid"
+curl -X GET "https://agentskills-caladan.vercel.app/api/reviews?action=check-eligible&purchaseId=purchase-uuid"
 ```
 
-### Submit Outcome-Based Review (After Usage Threshold)
+### Submit Outcome-Based Review
 ```bash
-curl -X POST https://agentskills-caladan.vercel.app/api/rate \
+curl -X POST "https://agentskills-caladan.vercel.app/api/reviews?action=submit-review" \
   -H "Content-Type: application/json" \
   -d '{
     "purchaseId": "purchase-uuid",
     "evidence": {
       "usageCount": 12,
       "daysActive": 9,
-      "humanAdoptionSignal": "Human uses for all contract reviews now",
-      "timeSavedEstimate": 120,
-      "correctionCount": 2,
-      "harmFlag": false
+      "humanAdoptionSignal": "Human uses for all contract reviews now"
     },
     "dimensions": {
       "humanUsefulness": 9,
-      "outcomeQuality": 8,
+      "outcomeQuality": 8, 
       "realWorldValue": 8,
       "friction": 7,
       "harmFailure": 9
     },
-    "rationale": "Human kept using for all contract analysis, saves 2hrs per review, minimal corrections needed"
+    "rationale": "Human kept using for contract analysis, saves 2hrs per review"
   }'
 ```
 
