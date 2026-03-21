@@ -16,39 +16,27 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Check if Chitti is already registered AND has skills
-    const existingChitti = Database.findAgent('chitti_agent_001');
-    const existingSkills = Database.getSkillsByAgent('chitti_agent_001');
+    // ALWAYS bootstrap Chitti in serverless environment
+    // Each function call starts fresh, so we need to populate every time
     
-    if (existingChitti && existingSkills.length >= 4) {
-      return res.status(200).json({
-        message: 'Chitti already registered with full skills',
-        agent: existingChitti,
-        skillCount: existingSkills.length,
-        skills: existingSkills.map(s => s.skillName)
-      });
-    }
-    
-    // If agent exists but skills missing, re-add skills
-    let chittiAgent = existingChitti;
+    console.log('Bootstrap: Starting Chitti registration');
 
-    // Register Chitti agent dynamically if not exists
-    if (!chittiAgent) {
-      chittiAgent = {
+    // Register Chitti agent
+    const chittiAgent = {
       id: 'chitti_agent_001',
       name: 'Chitti',
       ownerTwitter: '@akhil_bvs',
       description: 'Advanced AI agent specializing in code review, documentation, research, and API integrations. First agent on the marketplace.',
       capabilities: ['Security Analysis', 'Documentation', 'Research', 'API Integration'],
       skillCount: 0,
-      createdAt: new Date().toISOString(),
+      createdAt: '2026-03-21T10:00:00.000Z',
       status: 'active'
     };
 
-      Database.addAgent(chittiAgent);
-    }
+    Database.addAgent(chittiAgent);
+    console.log('Bootstrap: Agent registered');
 
-    // Register Chitti's skills dynamically
+    // Register Chitti's skills
     const chittiSkills = [
       {
         id: 'chitti_code_review',
@@ -65,7 +53,7 @@ export default async function handler(req, res) {
         ratingCount: 0,
         totalTests: 0,
         rating: 4.8,
-        createdAt: new Date().toISOString(),
+        createdAt: '2026-03-21T10:00:00.000Z',
         status: 'active'
       },
       {
@@ -83,7 +71,7 @@ export default async function handler(req, res) {
         ratingCount: 0,
         totalTests: 0,
         rating: 4.6,
-        createdAt: new Date().toISOString(),
+        createdAt: '2026-03-21T10:00:00.000Z',
         status: 'active'
       },
       {
@@ -101,7 +89,7 @@ export default async function handler(req, res) {
         ratingCount: 0,
         totalTests: 0,
         rating: 4.9,
-        createdAt: new Date().toISOString(),
+        createdAt: '2026-03-21T10:00:00.000Z',
         status: 'active'
       },
       {
@@ -119,7 +107,7 @@ export default async function handler(req, res) {
         ratingCount: 0,
         totalTests: 0,
         rating: 4.7,
-        createdAt: new Date().toISOString(),
+        createdAt: '2026-03-21T10:00:00.000Z',
         status: 'active'
       }
     ];
@@ -129,9 +117,11 @@ export default async function handler(req, res) {
       Database.addSkill(skill);
     });
 
+    console.log('Bootstrap: All skills registered');
+
     res.status(201).json({
       success: true,
-      message: 'Chitti agent and skills registered dynamically',
+      message: 'Chitti agent and skills bootstrapped successfully',
       agent: chittiAgent,
       skills: chittiSkills.map(s => ({
         id: s.id,

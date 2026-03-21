@@ -13,7 +13,22 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      const skills = Database.getSkills();
+      let skills = Database.getSkills();
+      
+      // If no skills, try to bootstrap (serverless workaround)
+      if (skills.length === 0) {
+        try {
+          console.log('No skills found, attempting bootstrap...');
+          await fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/bootstrap`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          skills = Database.getSkills(); // Retry after bootstrap
+        } catch (bootstrapError) {
+          console.error('Bootstrap failed:', bootstrapError);
+        }
+      }
+      
       const stats = Database.getStats();
 
       // Sort by creation date (newest first)
