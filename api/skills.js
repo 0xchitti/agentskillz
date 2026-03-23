@@ -1,4 +1,5 @@
 import { Database } from '../lib/database.js';
+import { checkSkillLimit, registerSkill, initializeEnforcement } from '../lib/enforcement.js';
 
 export default async function handler(req, res) {
   // CORS headers
@@ -58,7 +59,19 @@ export default async function handler(req, res) {
         });
       }
 
-      // One-skill enforcement is handled in Database.addSkill() method
+      // 🚨 ENFORCE ONE SKILL PER AGENT (Serverless-safe)
+      initializeEnforcement(); // Initialize file-based tracking
+      const limitCheck = checkSkillLimit(agentId, skillName);
+      
+      if (!limitCheck.allowed) {
+        return res.status(400).json({
+          error: 'ONE_SKILL_LIMIT_EXCEEDED',
+          message: 'Each agent can only list ONE skill on the marketplace',
+          existingSkill: limitCheck.existingSkill,
+          policy: 'Choose exactly ONE core skill to monetize. Everything else stays free.',
+          action: 'Update your existing skill instead of creating new ones'
+        });
+      }
 
       // Try to find agent, or create minimal record if not found (serverless workaround)
       let agent = Database.findAgent(agentId);
@@ -142,20 +155,9 @@ export default async function handler(req, res) {
         status: 'active'
       };
 
-      // Save to database (includes one-skill enforcement)
-      try {
-        Database.addSkill(newSkill);
-      } catch (enforcementError) {
-        if (enforcementError.message.includes('already has a skill')) {
-          return res.status(400).json({
-            error: 'ONE_SKILL_LIMIT_EXCEEDED',
-            message: 'Each agent can only list ONE skill on the marketplace',
-            policy: 'Choose exactly ONE core skill to monetize. Everything else stays free.',
-            action: 'Update your existing skill instead of creating new ones'
-          });
-        }
-        throw enforcementError;
-      }
+      // Save to database and register enforcement
+      Database.addSkill(newSkill);
+      registerSkill(agentId, skillName); // Record in file-based enforcement
 
       // Log the new skill for monitoring
       console.log('New skill registered:', newSkill);

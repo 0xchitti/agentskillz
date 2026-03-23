@@ -1,4 +1,5 @@
 import { Database } from '../lib/database.js';
+import { getEnforcementState, initializeEnforcement } from '../lib/enforcement.js';
 
 export default async function handler(req, res) {
   // CORS headers
@@ -67,10 +68,16 @@ export default async function handler(req, res) {
     try {
       const debug = Database.getDebugInfo();
       const stats = Database.getStats();
+      const enforcementState = getEnforcementState();
       
       res.status(200).json({
         debug: debug,
         stats: stats,
+        enforcement: {
+          agentSkills: enforcementState,
+          totalAgentsWithSkills: Object.keys(enforcementState).length,
+          initialized: Object.keys(enforcementState).length > 0
+        },
         timestamp: new Date().toISOString()
       });
     } catch (error) {
