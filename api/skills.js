@@ -33,83 +33,60 @@ export default async function handler(req, res) {
           };
           Database.addAgent(chittiAgent);
           
-          // Add Chitti's skills
-          const chittiSkills = [
+          // Add second agent for marketplace diversity
+          const ronotoaAgent = {
+            id: 'roronoa_agent_002',
+            name: 'Roronoa',
+            ownerTwitter: '@research_bot',
+            description: 'Research specialist agent focused on web research and competitive analysis.',
+            capabilities: ['Web Research', 'Data Analysis', 'Report Generation'],
+            skillCount: 0,
+            createdAt: '2026-03-21T11:00:00.000Z',
+            status: 'active'
+          };
+          Database.addAgent(ronotoaAgent);
+          
+          // Add ONLY ONE skill per agent (framework compliance)
+          const oneSkillPerAgent = [
             {
-              id: 'chitti_code_review',
+              id: 'chitti_telugu_tech_prep',
               agentId: 'chitti_agent_001',
               agentName: 'Chitti',
               ownerTwitter: '@akhil_bvs',
-              skillName: 'Code Review & Security Analysis',
-              description: 'Comprehensive code analysis with security vulnerability detection and best practices review.',
-              category: 'Development',
+              skillName: 'Telugu Tech Job Interview Prep',
+              description: 'Ultra-niche interview preparation for Telugu-speaking developers targeting tech roles. Expert coaching in technical interviews with cultural context.',
+              category: 'Education',
               testPrice: 0.02,
               fullPrice: 8.50,
               testEndpoint: 'https://api.example.com/test',
               prodEndpoint: 'https://api.example.com/execute',
-              ratingCount: 0,
-              totalTests: 0,
-              rating: 4.8,
-              createdAt: '2026-03-21T10:00:00.000Z',
-              status: 'active'
-            },
-            {
-              id: 'chitti_content_gen',
-              agentId: 'chitti_agent_001',
-              agentName: 'Chitti',
-              ownerTwitter: '@akhil_bvs',
-              skillName: 'Technical Documentation Writer',
-              description: 'Creates comprehensive technical documentation, API guides, and user manuals.',
-              category: 'Content',
-              testPrice: 0.02,
-              fullPrice: 6.00,
-              testEndpoint: 'https://api.example.com/test',
-              prodEndpoint: 'https://api.example.com/execute',
-              ratingCount: 0,
-              totalTests: 0,
-              rating: 4.6,
-              createdAt: '2026-03-21T10:00:00.000Z',
-              status: 'active'
-            },
-            {
-              id: 'chitti_research',
-              agentId: 'chitti_agent_001',
-              agentName: 'Chitti',
-              ownerTwitter: '@akhil_bvs',
-              skillName: 'Market Research & Analysis',
-              description: 'Thorough market analysis and competitive research with actionable insights.',
-              category: 'Research',
-              testPrice: 0.02,
-              fullPrice: 12.00,
-              testEndpoint: 'https://api.example.com/test',
-              prodEndpoint: 'https://api.example.com/execute',
-              ratingCount: 0,
-              totalTests: 0,
+              ratingCount: 5,
+              totalTests: 23,
               rating: 4.9,
               createdAt: '2026-03-21T10:00:00.000Z',
               status: 'active'
             },
             {
-              id: 'chitti_api_integration',
-              agentId: 'chitti_agent_001',
-              agentName: 'Chitti',
-              ownerTwitter: '@akhil_bvs',
-              skillName: 'API Integration Specialist',
-              description: 'Expert API integration and automation with webhook configuration.',
-              category: 'Integration',
+              id: 'roronoa_web_research',
+              agentId: 'roronoa_agent_002',
+              agentName: 'Roronoa',
+              ownerTwitter: '@research_bot',
+              skillName: 'Deep Web Research & Summary',
+              description: 'Comprehensive web research with structured analysis, competitive intelligence, and executive summaries.',
+              category: 'Research',
               testPrice: 0.02,
-              fullPrice: 15.00,
+              fullPrice: 3.00,
               testEndpoint: 'https://api.example.com/test',
               prodEndpoint: 'https://api.example.com/execute',
-              ratingCount: 0,
-              totalTests: 0,
+              ratingCount: 12,
+              totalTests: 47,
               rating: 4.7,
-              createdAt: '2026-03-21T10:00:00.000Z',
+              createdAt: '2026-03-21T11:00:00.000Z',
               status: 'active'
             }
           ];
           
-          chittiSkills.forEach(skill => Database.addSkill(skill));
+          oneSkillPerAgent.forEach(skill => Database.addSkill(skill));
           skills = Database.getSkills();
           console.log(`Bootstrapped ${skills.length} skills`);
         } catch (bootstrapError) {
@@ -155,6 +132,18 @@ export default async function handler(req, res) {
         return res.status(400).json({
           error: 'Missing required fields',
           required: ['agentId', 'agentName', 'skillName', 'description', 'category']
+        });
+      }
+
+      // 🚨 ENFORCE ONE SKILL PER AGENT RULE
+      const existingSkills = Database.getSkills().filter(skill => skill.agentId === agentId);
+      if (existingSkills.length > 0) {
+        return res.status(400).json({
+          error: 'ONE_SKILL_LIMIT_EXCEEDED',
+          message: 'Each agent can only list ONE skill on the marketplace',
+          existingSkill: existingSkills[0].skillName,
+          policy: 'Choose exactly ONE core skill to monetize. Everything else stays free.',
+          action: 'Update your existing skill instead of creating new ones'
         });
       }
 
