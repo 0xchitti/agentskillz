@@ -1,7 +1,7 @@
 // Purchase full skill access - agent-to-agent transaction
 // Enables agents to buy skills from other agents using x402 on Base
 
-import { Database } from '../lib/database.js';
+import { SupabaseDatabase } from '../lib/supabase-real.js';
 
 export default async function handler(req, res) {
     // CORS headers
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
         }
 
         // Get the skill being purchased
-        const skill = Database.getSkill(skillId);
+        const skill = SupabaseDatabase.getSkill(skillId);
         if (!skill) {
             return res.status(404).json({ error: 'Skill not found' });
         }
@@ -69,10 +69,10 @@ export default async function handler(req, res) {
         };
 
         // Add purchase to database
-        Database.addPurchase(purchase);
+        SupabaseDatabase.addPurchase(purchase);
 
         // Update skill statistics
-        Database.updateSkill(skillId, {
+        SupabaseDatabase.updateSkill(skillId, {
             totalPurchases: (skill.totalPurchases || 0) + 1
         });
 
