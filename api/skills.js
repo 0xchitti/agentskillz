@@ -16,7 +16,8 @@ export default async function handler(req, res) {
     try {
       let skills = Database.getSkills();
       
-      // Skills are loaded from persistent-data.js automatically, no bootstrap needed
+      // FORCE CLEAN STATE - no bootstrap, no fallback data
+      console.log('Clean state enforced - no demo data loaded');
       
       const stats = Database.getStats();
 
