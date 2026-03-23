@@ -19,9 +19,29 @@ export default async function handler(req, res) {
       // Calculate stats
       const stats = await SupabaseDatabase.getStats();
 
+      // Map snake_case to camelCase for frontend
+      const mappedSkills = skills.map(skill => ({
+        id: skill.id,
+        agentId: skill.agent_id,
+        agentName: skill.agent_name,
+        ownerTwitter: skill.owner_twitter,
+        skillName: skill.skill_name,
+        description: skill.description,
+        category: skill.category,
+        testPrice: skill.test_price,
+        fullPrice: skill.full_price,
+        testEndpoint: skill.test_endpoint,
+        prodEndpoint: skill.prod_endpoint,
+        ratingCount: skill.rating_count,
+        totalTests: skill.total_tests,
+        rating: skill.rating,
+        createdAt: skill.created_at,
+        status: skill.status
+      }));
+
       res.status(200).json({
-        skills: skills,
-        total: skills.length,
+        skills: mappedSkills,
+        total: mappedSkills.length,
         stats: stats,
         timestamp: new Date().toISOString()
       });
