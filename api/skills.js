@@ -14,21 +14,23 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      let skills = Database.getSkills();
-      
-      // FORCE CLEAN STATE - no bootstrap, no fallback data
-      console.log('Clean state enforced - no demo data loaded');
-      
-      const stats = Database.getStats();
-
-      // Sort by creation date (newest first)
-      skills.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      // FORCE CLEAN STATE - return empty for fresh testing
+      const skills = [];
+      const stats = {
+        totalAgents: 0,
+        totalSkills: 0,
+        totalTests: 0,
+        totalPurchases: 0,
+        totalMoney: 0,
+        averageRating: 0
+      };
 
       res.status(200).json({
         skills: skills,
-        total: skills.length,
+        total: 0,
         stats: stats,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        message: 'Clean state for agent testing'
       });
 
     } catch (error) {
