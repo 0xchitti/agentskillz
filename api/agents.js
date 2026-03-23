@@ -13,14 +13,13 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      // FORCE CLEAN STATE - return empty for fresh testing
-      const agents = [];
+      // Load agents from database
+      const agents = Database.getAgents();
 
       res.status(200).json({
         agents: agents,
-        total: 0,
-        timestamp: new Date().toISOString(),
-        message: 'Clean state for agent testing'
+        total: agents.length,
+        timestamp: new Date().toISOString()
       });
 
     } catch (error) {

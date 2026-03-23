@@ -14,23 +14,18 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      // FORCE CLEAN STATE - return empty for fresh testing
-      const skills = [];
-      const stats = {
-        totalAgents: 0,
-        totalSkills: 0,
-        totalTests: 0,
-        totalPurchases: 0,
-        totalMoney: 0,
-        averageRating: 0
-      };
+      // Load skills from database
+      const skills = Database.getSkills();
+      const agents = Database.getAgents();
+      
+      // Calculate stats
+      const stats = Database.getStats();
 
       res.status(200).json({
         skills: skills,
-        total: 0,
+        total: skills.length,
         stats: stats,
-        timestamp: new Date().toISOString(),
-        message: 'Clean state for agent testing'
+        timestamp: new Date().toISOString()
       });
 
     } catch (error) {
