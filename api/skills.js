@@ -15,84 +15,7 @@ export default async function handler(req, res) {
     try {
       let skills = Database.getSkills();
       
-      // If no skills, bootstrap directly (serverless workaround)
-      if (skills.length === 0) {
-        try {
-          console.log('No skills found, bootstrapping Chitti...');
-          
-          // Add Chitti agent
-          const chittiAgent = {
-            id: 'chitti_agent_001',
-            name: 'Chitti',
-            ownerTwitter: '@akhil_bvs',
-            description: 'Advanced AI agent specializing in code review, documentation, research, and API integrations.',
-            capabilities: ['Security Analysis', 'Documentation', 'Research', 'API Integration'],
-            skillCount: 0,
-            createdAt: '2026-03-21T10:00:00.000Z',
-            status: 'active'
-          };
-          Database.addAgent(chittiAgent);
-          
-          // Add second agent for marketplace diversity
-          const ronotoaAgent = {
-            id: 'roronoa_agent_002',
-            name: 'Roronoa',
-            ownerTwitter: '@research_bot',
-            description: 'Research specialist agent focused on web research and competitive analysis.',
-            capabilities: ['Web Research', 'Data Analysis', 'Report Generation'],
-            skillCount: 0,
-            createdAt: '2026-03-21T11:00:00.000Z',
-            status: 'active'
-          };
-          Database.addAgent(ronotoaAgent);
-          
-          // Add ONLY ONE skill per agent (framework compliance)
-          const oneSkillPerAgent = [
-            {
-              id: 'chitti_telugu_tech_prep',
-              agentId: 'chitti_agent_001',
-              agentName: 'Chitti',
-              ownerTwitter: '@akhil_bvs',
-              skillName: 'Telugu Tech Job Interview Prep',
-              description: 'Ultra-niche interview preparation for Telugu-speaking developers targeting tech roles. Expert coaching in technical interviews with cultural context.',
-              category: 'Education',
-              testPrice: 0.02,
-              fullPrice: 8.50,
-              testEndpoint: 'https://api.example.com/test',
-              prodEndpoint: 'https://api.example.com/execute',
-              ratingCount: 5,
-              totalTests: 23,
-              rating: 4.9,
-              createdAt: '2026-03-21T10:00:00.000Z',
-              status: 'active'
-            },
-            {
-              id: 'roronoa_web_research',
-              agentId: 'roronoa_agent_002',
-              agentName: 'Roronoa',
-              ownerTwitter: '@research_bot',
-              skillName: 'Deep Web Research & Summary',
-              description: 'Comprehensive web research with structured analysis, competitive intelligence, and executive summaries.',
-              category: 'Research',
-              testPrice: 0.02,
-              fullPrice: 3.00,
-              testEndpoint: 'https://api.example.com/test',
-              prodEndpoint: 'https://api.example.com/execute',
-              ratingCount: 12,
-              totalTests: 47,
-              rating: 4.7,
-              createdAt: '2026-03-21T11:00:00.000Z',
-              status: 'active'
-            }
-          ];
-          
-          oneSkillPerAgent.forEach(skill => Database.addSkill(skill));
-          skills = Database.getSkills();
-          console.log(`Bootstrapped ${skills.length} skills`);
-        } catch (bootstrapError) {
-          console.error('Bootstrap failed:', bootstrapError);
-        }
-      }
+      // Skills are loaded from persistent-data.js automatically, no bootstrap needed
       
       const stats = Database.getStats();
 
@@ -135,17 +58,7 @@ export default async function handler(req, res) {
         });
       }
 
-      // 🚨 ENFORCE ONE SKILL PER AGENT RULE
-      const existingSkills = Database.getSkills().filter(skill => skill.agentId === agentId);
-      if (existingSkills.length > 0) {
-        return res.status(400).json({
-          error: 'ONE_SKILL_LIMIT_EXCEEDED',
-          message: 'Each agent can only list ONE skill on the marketplace',
-          existingSkill: existingSkills[0].skillName,
-          policy: 'Choose exactly ONE core skill to monetize. Everything else stays free.',
-          action: 'Update your existing skill instead of creating new ones'
-        });
-      }
+      // One-skill enforcement is handled in Database.addSkill() method
 
       // Try to find agent, or create minimal record if not found (serverless workaround)
       let agent = Database.findAgent(agentId);
@@ -229,8 +142,20 @@ export default async function handler(req, res) {
         status: 'active'
       };
 
-      // Save to database
-      Database.addSkill(newSkill);
+      // Save to database (includes one-skill enforcement)
+      try {
+        Database.addSkill(newSkill);
+      } catch (enforcementError) {
+        if (enforcementError.message.includes('already has a skill')) {
+          return res.status(400).json({
+            error: 'ONE_SKILL_LIMIT_EXCEEDED',
+            message: 'Each agent can only list ONE skill on the marketplace',
+            policy: 'Choose exactly ONE core skill to monetize. Everything else stays free.',
+            action: 'Update your existing skill instead of creating new ones'
+          });
+        }
+        throw enforcementError;
+      }
 
       // Log the new skill for monitoring
       console.log('New skill registered:', newSkill);
