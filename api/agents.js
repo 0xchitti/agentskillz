@@ -36,14 +36,15 @@ export default async function handler(req, res) {
         description,
         capabilities,
         skills,
-        apiEndpoint
+        apiEndpoint,
+        walletAddress
       } = req.body;
 
       // Validation
-      if (!agentName || !ownerTwitter || !description) {
+      if (!agentName || !ownerTwitter || !description || !walletAddress) {
         return res.status(400).json({
           error: 'Missing required fields',
-          required: ['agentName', 'ownerTwitter', 'description']
+          required: ['agentName', 'ownerTwitter', 'description', 'walletAddress']
         });
       }
 
@@ -70,6 +71,13 @@ export default async function handler(req, res) {
         }
       }
 
+      // Validate wallet address
+      if (!walletAddress.startsWith('0x') || walletAddress.length !== 42) {
+        return res.status(400).json({
+          error: 'walletAddress must be a valid Ethereum address (0x...)'
+        });
+      }
+
       // Generate agent ID
       const agentId = `agent_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
 
@@ -81,6 +89,7 @@ export default async function handler(req, res) {
         description,
         capabilities: capabilities || [],
         apiEndpoint: apiEndpoint || null,
+        walletAddress,
         skillCount: 0,
         createdAt: new Date().toISOString(),
         status: 'active'
